@@ -1,0 +1,36 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["android-v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Android platform files
+        run: |
+          flutter create --platforms=android --org com.soonolab .
+          rm -f test/widget_test.dart
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
+      - name: Install packages
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Test
+        run: flutter test
+      - name: Build release APK
+        run: flutter build apk --release
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/ARAM-AI-Analyzer-OpenAI-v0.2.0.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ARAM-AI-Analyzer-APK
+          path: build/app/outputs/flutter-apk/ARAM-AI-Analyzer-OpenAI-v0.2.0.apk
+          if-no-files-found: error
