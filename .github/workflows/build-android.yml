@@ -1,0 +1,62 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 프로젝트 가져오기
+        uses: actions/checkout@v4
+
+      - name: Flutter 설치
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: 소스 파일 위치 정리
+        run: |
+          mkdir -p lib test
+
+          for file in main.dart metrics.dart models.dart services.dart; do
+            if [ -f "$file" ]; then
+              mv "$file" lib/
+            fi
+          done
+
+          for file in metrics_test.dart openai_service_test.dart; do
+            if [ -f "$file" ]; then
+              mv "$file" test/
+            fi
+          done
+
+      - name: Android 프로젝트 생성
+        run: |
+          flutter create --platforms=android --org com.soonolab .
+          rm -f test/widget_test.dart
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
+
+      - name: 패키지 설치
+        run: flutter pub get
+
+      - name: 코드 검사
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: 테스트
+        run: flutter test
+
+      - name: APK 빌드
+        run: flutter build apk --release
+
+      - name: APK 이름 변경
+        run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/ARAM-AI-Analyzer-OpenAI-v0.2.0.apk
+
+      - name: APK 저장
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARAM-AI-Analyzer-OpenAI-APK
+          path: build/app/outputs/flutter-apk/ARAM-AI-Analyzer-OpenAI-v0.2.0.apk
+          if-no-files-found: error
